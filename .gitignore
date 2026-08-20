@@ -1,17 +1,53 @@
-
-build/
-cmake-build-*/
 .idea/
+cmake-build-*/
+build/
 
-CMakeCache.txt
-CMakeFiles/
-Makefile
-*.cmake
+# Prerequisites
+*.d
 
+# Compiled Object files
+*.slo
+*.lo
 *.o
 *.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Linker files
+*.ilk
+
+# Debugger Files
+*.pdb
 *.exe
-*.dll
-*.lib
-*.a
+*.ii
+*.s
+*.o
+
+# Compiled Dynamic libraries
+*.so
 *.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# debug information files
+*.dwo
+
+lib/
+
+build_*/
