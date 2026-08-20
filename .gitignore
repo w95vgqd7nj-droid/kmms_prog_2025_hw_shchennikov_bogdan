@@ -1,0 +1,19 @@
+# Папки сборок CMake и настройки CLion
+build/
+cmake-build-*/
+.idea/
+
+# Временные файлы CMake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+*.cmake
+
+# Скомпилированные файлы
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.a
+*.dylib
