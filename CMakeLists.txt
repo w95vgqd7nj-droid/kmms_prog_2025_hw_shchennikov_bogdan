@@ -4,3 +4,5 @@ project(ProgrammingLabs)
 add_subdirectory(long_number)
 
 add_subdirectory(vector_list)
+
+add_subdirectory(mario)
