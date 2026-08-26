@@ -349,8 +349,7 @@ void CreateLevel(int lvl)
     maxlvl = 3;
 }
 
-int main()
-{
+int main() {
     initscr();
     noecho();
     cbreak();
