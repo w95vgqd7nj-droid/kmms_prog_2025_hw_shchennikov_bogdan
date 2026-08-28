@@ -35,7 +35,7 @@ static const char TYPE_EXIT = '+';
 static const char TYPE_LINES = '-';
 static const char TYPE_MARIO = '@';
 
-typedef struct SObject{
+typedef struct SObject {
     float x;
     float y;
     float width;
@@ -62,7 +62,7 @@ void player_dead(int* current_level, char map[MAP_HEIGHT][MAP_WIDTH+1], Object* 
 void put_object_on_map(char map[MAP_HEIGHT][MAP_WIDTH+1], const Object* obj, float camera_x);
 void put_score_on_map(char map[MAP_HEIGHT][MAP_WIDTH+1], int player_score);
 void set_object_pos(Object* obj, float x_pos, float y_pos);
-void show_map(char map[MAP_HEIGHT][MAP_WIDTH+1]);
+void show_map(const char map[MAP_HEIGHT][MAP_WIDTH+1]);
 void show_preview();
 void vertical_move_object(Object* obj, Object** brick, int brick_counts, Object** moving_objects, int* moving_objects_count, int* current_level, int max_level, char map[MAP_HEIGHT][MAP_WIDTH+1], Object* mario, int* player_score, float* camera_x);
 
@@ -125,6 +125,7 @@ int main()
         {
             put_object_on_map(map, &brick[i], camera_x);
         }
+
         for(int i = 0; i < moving_objects_count; i++)
         {
             vertical_move_object(&moving_objects[i], &brick, brick_counts, &moving_objects, &moving_objects_count, &current_level, max_level, map, &mario, &player_score, &camera_x);
@@ -147,7 +148,7 @@ int main()
     return 0;
 }
 
-void clear_map(char map[MAP_HEIGHT][MAP_WIDTH+1]){
+void clear_map(char map[MAP_HEIGHT][MAP_WIDTH+1]) {
     for (int i = 0; i < MAP_WIDTH; i++)
     {
         map[0][i] = ' ';
@@ -174,7 +175,7 @@ void create_level(int lvl, char map[MAP_HEIGHT][MAP_WIDTH+1], Object* mario, Obj
 
     init_object(mario, MARIO_START_X, MARIO_START_Y, MARIO_WIDTH, MARIO_HEIGHT, TYPE_MARIO);
     *player_score = 0;
-    *camera_x = 0;
+    *camera_x = 0.0f;
 
     if(lvl == 1)
     {
@@ -256,6 +257,7 @@ void free_game_resources(Object** brick, Object** moving_objects) {
         free(*brick);
         *brick = NULL;
     }
+
     if (*moving_objects != NULL)
     {
         free(*moving_objects);
@@ -263,14 +265,14 @@ void free_game_resources(Object** brick, Object** moving_objects) {
     }
 }
 
-Object *get_new_brick(Object** brick, int* brick_counts)
+Object* get_new_brick(Object** brick, int* brick_counts)
 {
     (*brick_counts)++;
     *brick = (Object*)realloc(*brick, sizeof(Object) * (*brick_counts));
     return (*brick) + (*brick_counts) - 1;
 }
 
-Object *get_new_moving_objects(Object** moving_objects, int* moving_objects_count)
+Object* get_new_moving_objects(Object** moving_objects, int* moving_objects_count)
 {
     (*moving_objects_count)++;
     *moving_objects = (Object*)realloc(*moving_objects, sizeof(Object) * (*moving_objects_count));
@@ -309,7 +311,7 @@ void horizontal_move_map(Object* mario, float dx, Object** brick, int brick_coun
     }
 }
 
-void horizontal_move_obj(Object *obj, Object** brick, int brick_counts, Object** moving_objects, int* moving_objects_count, int* current_level, int max_level, char map[MAP_HEIGHT][MAP_WIDTH+1], Object* mario, int* player_score, float* camera_x)
+void horizontal_move_obj(Object* obj, Object** brick, int brick_counts, Object** moving_objects, int* moving_objects_count, int* current_level, int max_level, char map[MAP_HEIGHT][MAP_WIDTH+1], Object* mario, int* player_score, float* camera_x)
 {
     obj->x += obj->horizontal_speed;
 
@@ -362,10 +364,10 @@ void mario_collision(Object* mario, Object** moving_objects, int* moving_objects
         {
             if((*moving_objects)[i].object_type == TYPE_ENEMY)
             {
-                if ( (mario->is_flying == true)
+                float half_h = (*moving_objects)[i].height * 0.5f;
+                if ((mario->is_flying == true)
                     && (mario->vertical_speed > 0)
-                    && (mario->y + mario->height < (*moving_objects)[i].y + (*moving_objects)[i].height * 0.5f)
-                )
+                    && (mario->y + mario->height < (*moving_objects)[i].y + half_h))
                 {
                     *player_score += SCORE_FOR_KILL;
                     delete_moving_objects(moving_objects, moving_objects_count, i);
@@ -395,7 +397,9 @@ void player_dead(int* current_level, char map[MAP_HEIGHT][MAP_WIDTH+1], Object* 
     create_level(*current_level, map, mario, brick, brick_counts, moving_objects, moving_objects_count, player_score, camera_x, max_level);
 }
 
+
 void put_object_on_map(char map[MAP_HEIGHT][MAP_WIDTH+1], const Object* obj, float camera_x){
+
     const int ix = (int)round(obj->x - camera_x);
     const int iy = (int)round(obj->y);
     const int iWidth = (int)round(obj->width);
@@ -434,8 +438,7 @@ void set_object_pos(Object *obj, float x_pos, float y_pos){
     obj->y = y_pos;
 }
 
-void show_map(char map[MAP_HEIGHT][MAP_WIDTH+1]){
-    map[MAP_HEIGHT - 1][MAP_WIDTH - 1]= '\0';
+void show_map(const char map[MAP_HEIGHT][MAP_WIDTH+1]){
     for (int j = 0; j < MAP_HEIGHT; j++)
     {
         mvprintw(j, 0, "%s", map[j]);
@@ -446,9 +449,9 @@ void show_map(char map[MAP_HEIGHT][MAP_WIDTH+1]){
 void show_preview()
 {
     clear();
-    printw("=== МАРИО НА СИ ===\n");
-    printw("Управление: A/D - движение, Пробел - прыжок, ESC - выход\n");
-    printw("Нажмите любую клавишу для начала...");
+    printw("=== MAPUO HA CU ===\n");
+    printw("YnpaB/eHue: A/D - gBu*eHue, npo6e/ - npbl*oK, ESC - BblXog\n");
+    printw("Ha*MuTe /o6ylo K/aBuly g/q Ha4a/a...");
     refresh();
     nodelay(stdscr, false);
     getch();
