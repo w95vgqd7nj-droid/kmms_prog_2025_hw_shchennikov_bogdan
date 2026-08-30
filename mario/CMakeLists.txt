@@ -4,3 +4,5 @@ project(mario)
 add_subdirectory(stage_1)
 
 add_subdirectory(stage_2)
+
+add_subdirectory(stage_3)
