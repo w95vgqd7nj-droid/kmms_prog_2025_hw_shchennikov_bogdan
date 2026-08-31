@@ -10,7 +10,7 @@ static const float COIN_DROP_SPEED = -0.7f;
 static const float ENEMY_WIDTH   = 3.0f;
 static const float ENEMY_HEIGHT  = 2.0f;
 static const float FRICTION = 0.2f;
-static const float GRAVITY = 0.04f;
+static const float GRAVITY = 0.05f;
 static const float MARIO_START_X = 39.0f;
 static const float MARIO_START_Y = 10.0f;
 static const float MARIO_WIDTH   = 3.0f;
@@ -68,13 +68,19 @@ public:
         is_flying = true;
         object_type = cur_type;
     }
+
+    bool check_collision(const GameObject& other) const {
+        return ((x + width) > other.x) &&
+               (x < (other.x + other.width)) &&
+               ((y + height) > other.y) &&
+               (y < (other.y + other.height));
+    }
 };
 
 void clear_map(char map[MAP_HEIGHT][MAP_WIDTH+1]);
 void create_level(int lvl, char map[MAP_HEIGHT][MAP_WIDTH+1], GameObject* mario, std::vector<GameObject>& bricks, std::vector<GameObject>& moving_objects, int* player_score, float* camera_x, int max_level);
 void horizontal_move_map(GameObject* mario, float dx, std::vector<GameObject>& bricks, std::vector<GameObject>& moving_objects, float* camera_x);
 void horizontal_move_obj(GameObject* obj, std::vector<GameObject>& bricks, std::vector<GameObject>& moving_objects, int* current_level, int max_level, char map[MAP_HEIGHT][MAP_WIDTH+1], GameObject* mario, int* player_score, float* camera_x);
-bool is_collision(const GameObject* obj_1, const GameObject* obj_2);
 bool is_position_on_map(int x, int y);
 void mario_collision(GameObject* mario, std::vector<GameObject>& moving_objects, int* player_score, int* current_level, char map[MAP_HEIGHT][MAP_WIDTH+1], std::vector<GameObject>& bricks, float* camera_x, int max_level);
 void player_dead(int* current_level, char map[MAP_HEIGHT][MAP_WIDTH+1], GameObject* mario, std::vector<GameObject>& bricks, std::vector<GameObject>& moving_objects, int* player_score, float* camera_x, int max_level);
@@ -256,7 +262,7 @@ void horizontal_move_map(GameObject* mario, float dx, std::vector<GameObject>& b
 
     for (size_t i = 0; i < bricks.size(); i++)
     {
-        if (is_collision(mario, &bricks[i]))
+        if (mario->check_collision(bricks[i]))
         {
             mario->x = old_x;
             return;
@@ -287,7 +293,7 @@ void horizontal_move_obj(GameObject* obj, std::vector<GameObject>& bricks, std::
 
     for (size_t i = 0; i < bricks.size(); i++)
     {
-        if (is_collision(obj, &bricks[i]))
+        if (obj->check_collision(bricks[i]))
         {
             obj->x -= obj->horizontal_speed;
             obj->horizontal_speed = -obj->horizontal_speed;
@@ -307,11 +313,6 @@ void horizontal_move_obj(GameObject* obj, std::vector<GameObject>& bricks, std::
     }
 }
 
-bool is_collision(const GameObject* obj_1, const GameObject* obj_2)
-{
-    return ((obj_1->x + obj_1->width) > obj_2->x) && (obj_1->x < (obj_2->x + obj_2->width)) && ((obj_1->y + obj_1->height) > obj_2->y) && (obj_1->y < (obj_2->y + obj_2->height));
-}
-
 bool is_position_on_map(int x, int y)
 {
     return ( (x >= 0) && (x < MAP_WIDTH) && (y >= 0) && (y < MAP_HEIGHT));
@@ -321,7 +322,7 @@ void mario_collision(GameObject* mario, std::vector<GameObject>& moving_objects,
 {
     for(size_t i = 0; i < moving_objects.size(); i++)
     {
-        if (is_collision(mario, &moving_objects[i]))
+        if (mario->check_collision(moving_objects[i]))
         {
             if(moving_objects[i].object_type == TYPE_ENEMY)
             {
@@ -411,9 +412,9 @@ void show_map(const char map[MAP_HEIGHT][MAP_WIDTH+1]){
 void show_preview()
 {
     clear();
-    printw("=== MAPUO HA CU ===\n");
-    printw("YnpaB/eHue: A/D - gBu*eHue, npo6e/ - npbl*oK, ESC - BblXog\n");
-    printw("Ha*MuTe /o6ylo K/aBuly g/q Ha4a/a...");
+    printw("МАРИО НА С++\n");
+    printw("Управление: A/D - движение, Пробел - прыжок, ESC - выход\n");
+    printw("нажмите любую клавишу для начала...");
     refresh();
     nodelay(stdscr, false);
     getch();
@@ -427,7 +428,7 @@ void vertical_move_object(GameObject *obj, std::vector<GameObject>& bricks, std:
 
     for (size_t i = 0; i < bricks.size(); i++)
     {
-        if (is_collision(obj, &bricks[i]))
+        if (obj->check_collision(bricks[i]))
         {
             if (obj->vertical_speed > 0)
             {
