@@ -78,7 +78,6 @@ public:
 };
 
 class GameEngine;
-void vertical_move_object(GameObject* obj, GameEngine& engine);
 void mario_collision(GameEngine& engine);
 void player_dead(GameEngine& engine);
 void show_preview();
@@ -253,23 +252,57 @@ public:
         }
     }
 
-    void horizontal_move_obj(GameObject* obj) {
-        obj->x += obj->horizontal_speed;
+    void vertical_move_object(GameObject& obj) {
+        obj.is_flying = true;
+        obj.vertical_speed += GRAVITY;
+        obj.y += obj.vertical_speed;
 
         for (size_t i = 0; i < bricks.size(); i++) {
-            if (obj->check_collision(bricks[i])) {
-                obj->x -= obj->horizontal_speed;
-                obj->horizontal_speed = -obj->horizontal_speed;
+            if (obj.check_collision(bricks[i])) {
+                if (obj.vertical_speed > 0) {
+                    obj.is_flying = false;
+                }
+
+                if ( (bricks[i].object_type == TYPE_BOX) && (obj.vertical_speed < 0) && (&obj == &mario) ) {
+                    bricks[i].object_type = '-';
+                    GameObject coin(bricks[i].x, bricks[i].y-3, 3, 2, TYPE_COIN);
+                    coin.vertical_speed = COIN_DROP_SPEED;
+                    moving_objects.push_back(coin);
+                }
+                obj.y -= obj.vertical_speed;
+                obj.vertical_speed = 0;
+
+                if(bricks[i].object_type == TYPE_EXIT) {
+                    current_level++;
+                    if (current_level > max_level) {
+                        current_level = 1;
+                    }
+
+                    napms(RESTART_DELAY_MS);
+                    create_level(current_level);
+                }
+                break;
+            }
+        }
+    }
+
+    void horizontal_move_obj(GameObject& obj) {
+        obj.x += obj.horizontal_speed;
+
+        for (size_t i = 0; i < bricks.size(); i++) {
+            if (obj.check_collision(bricks[i])) {
+                obj.x -= obj.horizontal_speed;
+                obj.horizontal_speed = -obj.horizontal_speed;
                 return;
             }
         }
 
-        if (obj->object_type == TYPE_ENEMY) {
-            GameObject tmp = *obj;
-            vertical_move_object(&tmp, *this);
+        if (obj.object_type == TYPE_ENEMY) {
+            GameObject tmp = obj;
+            vertical_move_object(tmp);
             if(tmp.is_flying == true) {
-                obj->x -= obj->horizontal_speed;
-                obj->horizontal_speed = -obj->horizontal_speed;
+                obj.x -= obj.horizontal_speed;
+                obj.horizontal_speed = -obj.horizontal_speed;
             }
         }
     }
@@ -314,7 +347,7 @@ int main()
             player_dead(engine);
         }
 
-        vertical_move_object(&engine.get_mario(), engine);
+        engine.vertical_move_object(engine.get_mario());
         mario_collision(engine);
 
         for(size_t i = 0; i < engine.get_bricks().size(); i++) {
@@ -322,8 +355,8 @@ int main()
         }
 
         for(size_t i = 0; i < engine.get_moving_objects().size(); i++) {
-            vertical_move_object(&engine.get_moving_objects()[i], engine);
-            engine.horizontal_move_obj(&engine.get_moving_objects()[i]);
+            engine.vertical_move_object(engine.get_moving_objects()[i]);
+            engine.horizontal_move_obj(engine.get_moving_objects()[i]);
             engine.put_object_on_map(engine.get_moving_objects()[i]);
         }
 
@@ -389,44 +422,4 @@ void show_preview()
     nodelay(stdscr, false);
     getch();
     nodelay(stdscr, true);
-}
-
-void vertical_move_object(GameObject *obj, GameEngine& engine)
-{
-    std::vector<GameObject>& bricks = engine.get_bricks();
-    std::vector<GameObject>& moving_objects = engine.get_moving_objects();
-    GameObject& mario = engine.get_mario();
-
-    obj->is_flying = true;
-    obj->vertical_speed += GRAVITY;
-    obj->y += obj->vertical_speed;
-
-    for (size_t i = 0; i < bricks.size(); i++) {
-        if (obj->check_collision(bricks[i])) {
-            if (obj->vertical_speed > 0) {
-                obj->is_flying = false;
-            }
-
-            if ( (bricks[i].object_type == TYPE_BOX) && (obj->vertical_speed < 0) && (obj == &mario) ) {
-                bricks[i].object_type = '-';
-                GameObject coin(bricks[i].x, bricks[i].y-3, 3, 2, TYPE_COIN);
-                coin.vertical_speed = COIN_DROP_SPEED;
-                moving_objects.push_back(coin);
-            }
-            obj->y -= obj->vertical_speed;
-            obj->vertical_speed = 0;
-
-            if(bricks[i].object_type == TYPE_EXIT) {
-                int next_lvl = engine.get_current_level() + 1;
-                if (next_lvl > engine.get_max_level()) {
-                    next_lvl = 1;
-                }
-                engine.set_current_level(next_lvl);
-
-                napms(RESTART_DELAY_MS);
-                engine.create_level(engine.get_current_level());
-            }
-            break;
-        }
-    }
 }
