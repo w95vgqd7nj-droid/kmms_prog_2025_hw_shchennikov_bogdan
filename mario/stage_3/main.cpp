@@ -77,6 +77,12 @@ public:
     }
 };
 
+class GameEngine;
+void vertical_move_object(GameObject* obj, GameEngine& engine);
+void mario_collision(GameEngine& engine);
+void player_dead(GameEngine& engine);
+void show_preview();
+
 class GameEngine {
 private:
     GameObject mario;
@@ -223,14 +229,51 @@ public:
         }
         refresh();
     }
-};
 
-void horizontal_move_map(float dx, GameEngine& engine);
-void horizontal_move_obj(GameObject* obj, GameEngine& engine);
-void mario_collision(GameEngine& engine);
-void player_dead(GameEngine& engine);
-void show_preview();
-void vertical_move_object(GameObject* obj, GameEngine& engine);
+    void horizontal_move_map(float dx) {
+        float old_x = mario.x;
+        mario.x -= dx;
+
+        for (size_t i = 0; i < bricks.size(); i++) {
+            if (mario.check_collision(bricks[i])) {
+                mario.x = old_x;
+                return;
+            }
+        }
+
+        camera_x = mario.x - MAP_WIDTH / 2.0f;
+        if (camera_x < 0) camera_x = 0;
+
+        for(size_t i = 0; i < bricks.size(); i++) {
+            bricks[i].x += dx;
+        }
+
+        for(size_t i = 0; i < moving_objects.size(); i++) {
+            moving_objects[i].x += dx;
+        }
+    }
+
+    void horizontal_move_obj(GameObject* obj) {
+        obj->x += obj->horizontal_speed;
+
+        for (size_t i = 0; i < bricks.size(); i++) {
+            if (obj->check_collision(bricks[i])) {
+                obj->x -= obj->horizontal_speed;
+                obj->horizontal_speed = -obj->horizontal_speed;
+                return;
+            }
+        }
+
+        if (obj->object_type == TYPE_ENEMY) {
+            GameObject tmp = *obj;
+            vertical_move_object(&tmp, *this);
+            if(tmp.is_flying == true) {
+                obj->x -= obj->horizontal_speed;
+                obj->horizontal_speed = -obj->horizontal_speed;
+            }
+        }
+    }
+};
 
 int main()
 {
@@ -258,10 +301,10 @@ int main()
                 engine.get_mario().vertical_speed = JUMP_POWER;
             }
             if (ch == 'a' || ch == 'A' || ch == KEY_LEFT) {
-                horizontal_move_map(1, engine);
+                engine.horizontal_move_map(1);
             }
             if (ch == 'd' || ch == 'D' || ch == KEY_RIGHT) {
-                horizontal_move_map(-1, engine);
+                engine.horizontal_move_map(-1);
             }
         }
 
@@ -280,7 +323,7 @@ int main()
 
         for(size_t i = 0; i < engine.get_moving_objects().size(); i++) {
             vertical_move_object(&engine.get_moving_objects()[i], engine);
-            horizontal_move_obj(&engine.get_moving_objects()[i], engine);
+            engine.horizontal_move_obj(&engine.get_moving_objects()[i]);
             engine.put_object_on_map(engine.get_moving_objects()[i]);
         }
 
@@ -295,61 +338,6 @@ int main()
 
     endwin();
     return 0;
-}
-
-void horizontal_move_map(float dx, GameEngine& engine)
-{
-    GameObject& mario = engine.get_mario();
-    std::vector<GameObject>& bricks = engine.get_bricks();
-    std::vector<GameObject>& moving_objects = engine.get_moving_objects();
-
-    float old_x = mario.x;
-    mario.x -= dx;
-
-    for (size_t i = 0; i < bricks.size(); i++) {
-        if (mario.check_collision(bricks[i])) {
-            mario.x = old_x;
-            return;
-        }
-    }
-
-    float new_camera_x = mario.x - MAP_WIDTH / 2.0f;
-    if (new_camera_x < 0) {
-        new_camera_x = 0;
-    }
-    engine.set_camera_x(new_camera_x);
-
-    for(size_t i = 0; i < bricks.size(); i++) {
-        bricks[i].x += dx;
-    }
-
-    for(size_t i = 0; i < moving_objects.size(); i++) {
-        moving_objects[i].x += dx;
-    }
-}
-
-void horizontal_move_obj(GameObject* obj, GameEngine& engine)
-{
-    std::vector<GameObject>& bricks = engine.get_bricks();
-
-    obj->x += obj->horizontal_speed;
-
-    for (size_t i = 0; i < bricks.size(); i++) {
-        if (obj->check_collision(bricks[i])) {
-            obj->x -= obj->horizontal_speed;
-            obj->horizontal_speed = -obj->horizontal_speed;
-            return;
-        }
-    }
-
-    if (obj->object_type == TYPE_ENEMY) {
-        GameObject tmp = *obj;
-        vertical_move_object(&tmp, engine);
-        if(tmp.is_flying == true) {
-            obj->x -= obj->horizontal_speed;
-            obj->horizontal_speed = -obj->horizontal_speed;
-        }
-    }
 }
 
 void mario_collision(GameEngine& engine)
