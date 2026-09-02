@@ -81,6 +81,122 @@ private:
     int current_level;
     int player_score;
 
+    bool isPositionOnMap(int x, int y) const {
+        return (x >= 0 && x < Config::MAP_WIDTH && y >= 0 && y < Config::MAP_HEIGHT);
+    }
+
+    void putObjectOnMap(const GameObject& obj) {
+        int ix = (int)round(obj.x - camera_x);
+        int iy = (int)round(obj.y);
+        int iWidth = (int)round(obj.width);
+        int iHeight = (int)round(obj.height);
+
+        for (int i = ix; i < (ix + iWidth); i++) {
+            for (int j = iy; j < (iy + iHeight); j++) {
+                if (isPositionOnMap(i, j) && j > 1) {
+                    map[j][i] = obj.object_type;
+                }
+            }
+        }
+    }
+
+    void putScoreOnMap() {
+        for (int i = Config::SCORE_X_OFFSET; i < Config::SCORE_AREA_WIDTH; i++) {
+            map[1][i] = ' ';
+        }
+        std::string score_str = "SCORE: " + std::to_string(player_score);
+        for (size_t i = 0; i < score_str.length(); i++) {
+            map[1][i + Config::SCORE_X_OFFSET] = score_str[i];
+        }
+    }
+
+    void showMap() const {
+        for (int j = 0; j < Config::MAP_HEIGHT; j++) {
+            mvprintw(j, 0, "%s", map[j]);
+        }
+        refresh();
+    }
+
+    void applyVerticalPhysics(GameObject& obj) {
+        obj.is_flying = true;
+        obj.vertical_speed += Config::GRAVITY;
+        obj.y += obj.vertical_speed;
+        for (size_t i = 0; i < bricks.size(); i++) {
+            if (obj.checkCollision(bricks[i])) {
+                if (obj.vertical_speed > 0) {
+                    obj.is_flying = false;
+                }
+                if ((bricks[i].object_type == Config::TYPE_BOX) && (obj.vertical_speed < 0) && (&obj == &mario)) {
+                    bricks[i].object_type = '-';
+                    GameObject coin(bricks[i].x, bricks[i].y - 3, 3, 2, Config::TYPE_COIN);
+                    coin.vertical_speed = Config::COIN_DROP_SPEED;
+                    moving_objects.push_back(coin);
+                }
+                obj.y -= obj.vertical_speed;
+                obj.vertical_speed = 0;
+
+                if (bricks[i].object_type == Config::TYPE_EXIT) {
+                    current_level++;
+                    if (current_level > max_level) {
+                        current_level = 1;
+                    }
+                    napms(Config::RESTART_DELAY_MS);
+                    loadLevel(current_level);
+                }
+                break;
+            }
+        }
+    }
+
+    void applyHorizontalPhysics(GameObject& obj) {
+        obj.x += obj.horizontal_speed;
+        for (size_t i = 0; i < bricks.size(); i++) {
+            if (obj.checkCollision(bricks[i])) {
+                obj.x -= obj.horizontal_speed;
+                obj.horizontal_speed = -obj.horizontal_speed;
+                return;
+            }
+        }
+        if (obj.object_type == Config::TYPE_ENEMY) {
+            GameObject tmp = obj;
+            applyVerticalPhysics(tmp);
+            if (tmp.is_flying == true) {
+                obj.x -= obj.horizontal_speed;
+                obj.horizontal_speed = -obj.horizontal_speed;
+            }
+        }
+    }
+
+    void checkInteractions() {
+        for (size_t i = 0; i < moving_objects.size(); i++) {
+            if (mario.checkCollision(moving_objects[i])) {
+                if (moving_objects[i].object_type == Config::TYPE_ENEMY) {
+                    float half_h = moving_objects[i].height * 0.5f;
+                    if ((mario.is_flying == true) && (mario.vertical_speed > 0) && (mario.y + mario.height < moving_objects[i].y + half_h)) {
+                        player_score += Config::SCORE_FOR_KILL;
+                        moving_objects.erase(moving_objects.begin() + i);
+                        i--;
+                        continue;
+                    } else {
+                        playerDead();
+                        return;
+                    }
+                }
+                if (moving_objects[i].object_type == Config::TYPE_COIN) {
+                    player_score += Config::SCORE_FOR_COIN;
+                    moving_objects.erase(moving_objects.begin() + i);
+                    i--;
+                    continue;
+                }
+            }
+        }
+    }
+
+    void playerDead() {
+        napms(Config::RESTART_DELAY_MS);
+        loadLevel(current_level);
+    }
+
 public:
     GameEngine() {
         camera_x = 0.0f;
@@ -91,14 +207,6 @@ public:
     }
 
     GameObject& getMario() { return mario; }
-    std::vector<GameObject>& getBricks() { return bricks; }
-    std::vector<GameObject>& getMovingObjects() { return moving_objects; }
-
-    int getCurrentLevel() const { return current_level; }
-    void setCurrentLevel(int lvl) { current_level = lvl; }
-
-    int getMaxLevel() const { return max_level; }
-    void addScore(int s) { player_score += s; }
 
     void clearMap() {
         for (int i = 0; i < Config::MAP_WIDTH; i++) {
@@ -170,42 +278,6 @@ public:
         }
     }
 
-    bool isPositionOnMap(int x, int y) const {
-        return (x >= 0 && x < Config::MAP_WIDTH && y >= 0 && y < Config::MAP_HEIGHT);
-    }
-
-    void putObjectOnMap(const GameObject& obj) {
-        int ix = (int)round(obj.x - camera_x);
-        int iy = (int)round(obj.y);
-        int iWidth = (int)round(obj.width);
-        int iHeight = (int)round(obj.height);
-
-        for (int i = ix; i < (ix + iWidth); i++) {
-            for (int j = iy; j < (iy + iHeight); j++) {
-                if (isPositionOnMap(i, j) && j > 1) {
-                    map[j][i] = obj.object_type;
-                }
-            }
-        }
-    }
-
-    void putScoreOnMap() {
-        for (int i = Config::SCORE_X_OFFSET; i < Config::SCORE_AREA_WIDTH; i++) {
-            map[1][i] = ' ';
-        }
-        std::string score_str = "SCORE: " + std::to_string(player_score);
-        for (size_t i = 0; i < score_str.length(); i++) {
-            map[1][i + Config::SCORE_X_OFFSET] = score_str[i];
-        }
-    }
-
-    void showMap() const {
-        for (int j = 0; j < Config::MAP_HEIGHT; j++) {
-            mvprintw(j, 0, "%s", map[j]);
-        }
-        refresh();
-    }
-
     void moveMapHorizontally(float dx) {
         float old_x = mario.x;
         mario.x -= dx;
@@ -225,84 +297,33 @@ public:
         }
     }
 
-    void applyVerticalPhysics(GameObject& obj) {
-        obj.is_flying = true;
-        obj.vertical_speed += Config::GRAVITY;
-        obj.y += obj.vertical_speed;
-        for (size_t i = 0; i < bricks.size(); i++) {
-            if (obj.checkCollision(bricks[i])) {
-                if (obj.vertical_speed > 0) {
-                    obj.is_flying = false;
-                }
-                if ((bricks[i].object_type == Config::TYPE_BOX) && (obj.vertical_speed < 0) && (&obj == &mario)) {
-                    bricks[i].object_type = '-';
-                    GameObject coin(bricks[i].x, bricks[i].y - 3, 3, 2, Config::TYPE_COIN);
-                    coin.vertical_speed = Config::COIN_DROP_SPEED;
-                    moving_objects.push_back(coin);
-                }
-                obj.y -= obj.vertical_speed;
-                obj.vertical_speed = 0;
-
-                if (bricks[i].object_type == Config::TYPE_EXIT) {
-                    current_level++;
-                    if (current_level > max_level) {
-                        current_level = 1;
-                    }
-                    napms(Config::RESTART_DELAY_MS);
-                    loadLevel(current_level);
-                }
-                break;
-            }
+    void update() {
+        if (Config::MAP_HEIGHT < mario.y || mario.y < 0) {
+            playerDead();
+            return;
         }
-    }
 
-    void applyHorizontalPhysics(GameObject& obj) {
-        obj.x += obj.horizontal_speed;
-        for (size_t i = 0; i < bricks.size(); i++) {
-            if (obj.checkCollision(bricks[i])) {
-                obj.x -= obj.horizontal_speed;
-                obj.horizontal_speed = -obj.horizontal_speed;
-                return;
-            }
-        }
-        if (obj.object_type == Config::TYPE_ENEMY) {
-            GameObject tmp = obj;
-            applyVerticalPhysics(tmp);
-            if (tmp.is_flying == true) {
-                obj.x -= obj.horizontal_speed;
-                obj.horizontal_speed = -obj.horizontal_speed;
-            }
-        }
-    }
+        applyVerticalPhysics(mario);
+        checkInteractions();
 
-    void playerDead() {
-        napms(Config::RESTART_DELAY_MS);
-        loadLevel(current_level);
-    }
-
-    void checkInteractions() {
         for (size_t i = 0; i < moving_objects.size(); i++) {
-            if (mario.checkCollision(moving_objects[i])) {
-                if (moving_objects[i].object_type == Config::TYPE_ENEMY) {
-                    float half_h = moving_objects[i].height * 0.5f;
-                    if ((mario.is_flying == true) && (mario.vertical_speed > 0) && (mario.y + mario.height < moving_objects[i].y + half_h)) {
-                        addScore(Config::SCORE_FOR_KILL);
-                        moving_objects.erase(moving_objects.begin() + i);
-                        i--;
-                        continue;
-                    } else {
-                        playerDead();
-                        return;
-                    }
-                }
-                if (moving_objects[i].object_type == Config::TYPE_COIN) {
-                    addScore(Config::SCORE_FOR_COIN);
-                    moving_objects.erase(moving_objects.begin() + i);
-                    i--;
-                    continue;
-                }
-            }
+            applyVerticalPhysics(moving_objects[i]);
+            applyHorizontalPhysics(moving_objects[i]);
         }
+    }
+
+    void render() {
+        for (size_t i = 0; i < bricks.size(); i++) {
+            putObjectOnMap(bricks[i]);
+        }
+        for (size_t i = 0; i < moving_objects.size(); i++) {
+            putObjectOnMap(moving_objects[i]);
+        }
+        putObjectOnMap(mario);
+        putScoreOnMap();
+
+        clear();
+        showMap();
     }
 };
 
@@ -350,28 +371,8 @@ int main() {
 
         if (!is_running) break;
 
-        if (Config::MAP_HEIGHT < engine.getMario().y || engine.getMario().y < 0) {
-            engine.playerDead();
-        }
-
-        engine.applyVerticalPhysics(engine.getMario());
-        engine.checkInteractions();
-
-        for (size_t i = 0; i < engine.getBricks().size(); i++) {
-            engine.putObjectOnMap(engine.getBricks()[i]);
-        }
-
-        for (size_t i = 0; i < engine.getMovingObjects().size(); i++) {
-            engine.applyVerticalPhysics(engine.getMovingObjects()[i]);
-            engine.applyHorizontalPhysics(engine.getMovingObjects()[i]);
-            engine.putObjectOnMap(engine.getMovingObjects()[i]);
-        }
-
-        engine.putObjectOnMap(engine.getMario());
-        engine.putScoreOnMap();
-
-        clear();
-        engine.showMap();
+        engine.update();
+        engine.render();
 
         napms(Config::FRAME_DELAY_MS);
     }
