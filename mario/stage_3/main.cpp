@@ -77,11 +77,6 @@ public:
     }
 };
 
-class GameEngine;
-void mario_collision(GameEngine& engine);
-void player_dead(GameEngine& engine);
-void show_preview();
-
 class GameEngine {
 private:
     GameObject mario;
@@ -306,7 +301,53 @@ public:
             }
         }
     }
+
+    void player_dead() {
+        napms(RESTART_DELAY_MS);
+        create_level(current_level);
+    }
+
+    void mario_collision() {
+        for(size_t i = 0; i < moving_objects.size(); i++) {
+            if (mario.check_collision(moving_objects[i])) {
+                if(moving_objects[i].object_type == TYPE_ENEMY) {
+                    float half_h = moving_objects[i].height * 0.5f;
+                    if ((mario.is_flying == true)
+                        && (mario.vertical_speed > 0)
+                        && (mario.y + mario.height < moving_objects[i].y + half_h))
+                    {
+                        add_score(SCORE_FOR_KILL);
+                        moving_objects.erase(moving_objects.begin() + i);
+                        i--;
+                        continue;
+                    } else {
+                        player_dead();
+                        return;
+                    }
+                }
+
+                if(moving_objects[i].object_type == TYPE_COIN) {
+                    add_score(SCORE_FOR_COIN);
+                    moving_objects.erase(moving_objects.begin() + i);
+                    i--;
+                    continue;
+                }
+            }
+        }
+    }
 };
+
+void show_preview()
+{
+    clear();
+    printw("МАРИО НА C++\n");
+    printw("Управление: A/D - движение, Пробел - прыжок, ESC - выход\n");
+    printw("Нажмите любую клавишу для начала...");
+    refresh();
+    nodelay(stdscr, false);
+    getch();
+    nodelay(stdscr, true);
+}
 
 int main()
 {
@@ -317,7 +358,6 @@ int main()
     keypad(stdscr, true);
 
     show_preview();
-    nodelay(stdscr, true);
 
     GameEngine engine;
 
@@ -344,11 +384,11 @@ int main()
         if (!is_running) break;
 
         if (MAP_HEIGHT < engine.get_mario().y || engine.get_mario().y < 0) {
-            player_dead(engine);
+            engine.player_dead();
         }
 
         engine.vertical_move_object(engine.get_mario());
-        mario_collision(engine);
+        engine.mario_collision();
 
         for(size_t i = 0; i < engine.get_bricks().size(); i++) {
             engine.put_object_on_map(engine.get_bricks()[i]);
@@ -371,55 +411,4 @@ int main()
 
     endwin();
     return 0;
-}
-
-void mario_collision(GameEngine& engine)
-{
-    GameObject& mario = engine.get_mario();
-    std::vector<GameObject>& moving_objects = engine.get_moving_objects();
-
-    for(size_t i = 0; i < moving_objects.size(); i++) {
-        if (mario.check_collision(moving_objects[i])) {
-            if(moving_objects[i].object_type == TYPE_ENEMY) {
-                float half_h = moving_objects[i].height * 0.5f;
-                if ((mario.is_flying == true)
-                    && (mario.vertical_speed > 0)
-                    && (mario.y + mario.height < moving_objects[i].y + half_h))
-                {
-                    engine.add_score(SCORE_FOR_KILL);
-                    moving_objects.erase(moving_objects.begin() + i);
-                    i--;
-                    continue;
-                } else {
-                    player_dead(engine);
-                    return;
-                }
-            }
-
-            if(moving_objects[i].object_type == TYPE_COIN) {
-                engine.add_score(SCORE_FOR_COIN);
-                moving_objects.erase(moving_objects.begin() + i);
-                i--;
-                continue;
-            }
-        }
-    }
-}
-
-void player_dead(GameEngine& engine)
-{
-    napms(RESTART_DELAY_MS);
-    engine.create_level(engine.get_current_level());
-}
-
-void show_preview()
-{
-    clear();
-    printw("МАРИО НА C++\n");
-    printw("Управление: A/D - движение, Пробел - прыжок, ESC - выход\n");
-    printw("Нажмите любую клавишу для начала...");
-    refresh();
-    nodelay(stdscr, false);
-    getch();
-    nodelay(stdscr, true);
 }
