@@ -80,6 +80,7 @@ private:
     int max_level;
     int current_level;
     int player_score;
+    bool is_running;
 
     bool isPositionOnMap(int x, int y) const {
         return (x >= 0 && x < Config::MAP_WIDTH && y >= 0 && y < Config::MAP_HEIGHT);
@@ -115,6 +116,17 @@ private:
             mvprintw(j, 0, "%s", map[j]);
         }
         refresh();
+    }
+
+    void clearMap() {
+        for (int i = 0; i < Config::MAP_WIDTH; i++) {
+            map[0][i] = ' ';
+            map[1][i] = ' ';
+        }
+        map[0][Config::MAP_WIDTH] = '\0';
+        for (int j = 1; j < Config::MAP_HEIGHT; j++) {
+            snprintf(map[j], sizeof(map[j]), "%s", map[0]);
+        }
     }
 
     void applyVerticalPhysics(GameObject& obj) {
@@ -197,25 +209,22 @@ private:
         loadLevel(current_level);
     }
 
-public:
-    GameEngine() {
-        camera_x = 0.0f;
-        max_level = 3;
-        current_level = 1;
-        player_score = 0;
-        loadLevel(current_level);
-    }
-
-    GameObject& getMario() { return mario; }
-
-    void clearMap() {
-        for (int i = 0; i < Config::MAP_WIDTH; i++) {
-            map[0][i] = ' ';
-            map[1][i] = ' ';
+    void moveMapHorizontally(float dx) {
+        float old_x = mario.x;
+        mario.x -= dx;
+        for (size_t i = 0; i < bricks.size(); i++) {
+            if (mario.checkCollision(bricks[i])) {
+                mario.x = old_x;
+                return;
+            }
         }
-        map[0][Config::MAP_WIDTH] = '\0';
-        for (int j = 1; j < Config::MAP_HEIGHT; j++) {
-            snprintf(map[j], sizeof(map[j]), "%s", map[0]);
+        camera_x = mario.x - Config::MAP_WIDTH / 2.0f;
+        if (camera_x < 0) camera_x = 0;
+        for (size_t i = 0; i < bricks.size(); i++) {
+            bricks[i].x += dx;
+        }
+        for (size_t i = 0; i < moving_objects.size(); i++) {
+            moving_objects[i].x += dx;
         }
     }
 
@@ -278,25 +287,6 @@ public:
         }
     }
 
-    void moveMapHorizontally(float dx) {
-        float old_x = mario.x;
-        mario.x -= dx;
-        for (size_t i = 0; i < bricks.size(); i++) {
-            if (mario.checkCollision(bricks[i])) {
-                mario.x = old_x;
-                return;
-            }
-        }
-        camera_x = mario.x - Config::MAP_WIDTH / 2.0f;
-        if (camera_x < 0) camera_x = 0;
-        for (size_t i = 0; i < bricks.size(); i++) {
-            bricks[i].x += dx;
-        }
-        for (size_t i = 0; i < moving_objects.size(); i++) {
-            moving_objects[i].x += dx;
-        }
-    }
-
     void update() {
         if (Config::MAP_HEIGHT < mario.y || mario.y < 0) {
             playerDead();
@@ -313,6 +303,8 @@ public:
     }
 
     void render() {
+        clearMap();
+
         for (size_t i = 0; i < bricks.size(); i++) {
             putObjectOnMap(bricks[i]);
         }
@@ -324,6 +316,43 @@ public:
 
         clear();
         showMap();
+    }
+
+public:
+    GameEngine() {
+        camera_x = 0.0f;
+        max_level = 3;
+        current_level = 1;
+        player_score = 0;
+        is_running = true;
+        loadLevel(current_level);
+    }
+
+    void run() {
+        while (is_running) {
+            int ch;
+            while ((ch = getch()) != ERR) {
+                if (ch == 27) {
+                    is_running = false;
+                }
+                if (ch == ' ' && mario.is_flying == false) {
+                    mario.vertical_speed = Config::JUMP_POWER;
+                }
+                if (ch == 'a' || ch == 'A' || ch == KEY_LEFT) {
+                    moveMapHorizontally(1);
+                }
+                if (ch == 'd' || ch == 'D' || ch == KEY_RIGHT) {
+                    moveMapHorizontally(-1);
+                }
+            }
+
+            if (!is_running) break;
+
+            update();
+            render();
+
+            napms(Config::FRAME_DELAY_MS);
+        }
     }
 };
 
@@ -348,34 +377,7 @@ int main() {
     showPreview();
 
     GameEngine engine;
-
-    bool is_running = true;
-    while (is_running) {
-        engine.clearMap();
-
-        int ch;
-        while ((ch = getch()) != ERR) {
-            if (ch == 27) {
-                is_running = false;
-            }
-            if (ch == ' ' && engine.getMario().is_flying == false) {
-                engine.getMario().vertical_speed = Config::JUMP_POWER;
-            }
-            if (ch == 'a' || ch == 'A' || ch == KEY_LEFT) {
-                engine.moveMapHorizontally(1);
-            }
-            if (ch == 'd' || ch == 'D' || ch == KEY_RIGHT) {
-                engine.moveMapHorizontally(-1);
-            }
-        }
-
-        if (!is_running) break;
-
-        engine.update();
-        engine.render();
-
-        napms(Config::FRAME_DELAY_MS);
-    }
+    engine.run();
 
     endwin();
     return 0;
