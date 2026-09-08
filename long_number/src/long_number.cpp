@@ -9,6 +9,36 @@ LongNumber::LongNumber() {
     numbers[0] = 0;
 }
 
+LongNumber::LongNumber(int value) {
+    if (value == 0) {
+        length = 1;
+        sign = 1;
+        numbers = new int[1];
+        numbers[0] = 0;
+        return;
+    }
+
+    if (value < 0) {
+        sign = -1;
+        value = -value;
+    } else {
+        sign = 1;
+    }
+
+    int temp = value;
+    length = 0;
+    while (temp > 0) {
+        length++;
+        temp /= 10;
+    }
+
+    numbers = new int[length];
+    temp = value;
+    for (int i = length - 1; i >= 0; i--) {
+        numbers[i] = temp % 10;
+        temp /= 10;
+    }
+}
 LongNumber::LongNumber(int length, int sign) {
     this->length = length;
     this->sign = sign;
@@ -317,8 +347,7 @@ LongNumber LongNumber::operator / (const LongNumber& x) const {
 
     for (int i = 0; i < dividend.length; ++i) {
         if (remainder.length == 1 && remainder.numbers[0] == 0) {
-            char buf[2] = { (char)(dividend.numbers[i] + '0'), '\0' };
-            remainder = LongNumber(buf);
+            remainder = LongNumber(dividend.numbers[i]);
         } else {
             LongNumber temp(remainder.length + 1, 1);
             for (int j = 0; j < remainder.length; ++j) temp.numbers[j] = remainder.numbers[j];
@@ -329,8 +358,8 @@ LongNumber LongNumber::operator / (const LongNumber& x) const {
 
         int digit = 0;
         for (int d = 9; d >= 0; --d) {
-            char buf[2] = { (char)(d + '0'), '\0' };
-            LongNumber product = divisor * LongNumber(buf);
+            LongNumber product = divisor * LongNumber(d);
+
             if (product < remainder || product == remainder) {
                 digit = d;
                 remainder = remainder - product;
