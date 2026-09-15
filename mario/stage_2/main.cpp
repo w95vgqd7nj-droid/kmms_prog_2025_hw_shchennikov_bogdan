@@ -67,10 +67,10 @@ public:
     }
 
     bool checkCollision(const GameObject& other) const {
-        return ((x + width) > other.x) &&
-               (x < (other.x + other.width)) &&
-               ((y + height) > other.y) &&
-               (y < (other.y + other.height));
+        return x + width > other.x &&
+               x < other.x + other.width &&
+               y + height > other.y &&
+               y < other.y + other.height;
     }
 };
 
@@ -89,8 +89,8 @@ private:
     float mario_dx;
 
     bool isPositionOnMap(int x, int y) const {
-        return (x >= 0 && x < Config::MAP_WIDTH &&
-                y >= 0 && y < Config::MAP_HEIGHT);
+        return x >= 0 && x < Config::MAP_WIDTH &&
+               y >= 0 && y < Config::MAP_HEIGHT;
     }
 
     void putObjectOnMap(const GameObject& obj) {
@@ -195,9 +195,9 @@ private:
             if (mario.checkCollision(moving_objects[i])) {
                 if (moving_objects[i].object_type == Config::TYPE_ENEMY) {
                     float half_h = moving_objects[i].height * 0.5f;
-                    if ((mario.is_flying == true) &&
-                        (mario.vertical_speed > 0) &&
-                        (mario.y + mario.height < moving_objects[i].y + half_h))
+                    if (mario.is_flying == true &&
+                        mario.vertical_speed > 0 &&
+                        mario.y + mario.height < moving_objects[i].y + half_h)
                     {
                         player_score += Config::SCORE_FOR_KILL;
                         moving_objects.erase(moving_objects.begin() + i);
@@ -225,7 +225,7 @@ private:
 
     void moveMapHorizontally(float dx) {
         float old_x = mario.x;
-        mario.x += dx; // Теперь используем классическое сложение
+        mario.x += dx;
 
         for (size_t i = 0; i < bricks.size(); i++) {
             if (mario.checkCollision(bricks[i])) {
@@ -390,10 +390,10 @@ public:
                     mario.vertical_speed = Config::JUMP_POWER;
                 }
                 if (ch == 'a' || ch == 'A' || ch == KEY_LEFT) {
-                    mario_dx = -Config::MARIO_SPEED; // Теперь влево это минус
+                    mario_dx = -Config::MARIO_SPEED;
                 }
                 if (ch == 'd' || ch == 'D' || ch == KEY_RIGHT) {
-                    mario_dx = Config::MARIO_SPEED;  // А вправо это плюс
+                    mario_dx = Config::MARIO_SPEED;
                 }
                 if (ch == 's' || ch == 'S' || ch == KEY_DOWN) {
                     mario_dx = 0.0f;
@@ -417,7 +417,7 @@ public:
 void showPreview() {
     clear();
     printw("МАРИО НА C++\n");
-    printw("Управление: A/D - движение, S - стоп, Пробел - прыжок, ESC\n");
+    printw("Управление: нажатие A/D - непрерывное движение, S - стоп, Пробел - прыжок, ESC\n");
     printw("Нажмите любую клавишу для начала...");
     refresh();
     nodelay(stdscr, false);
