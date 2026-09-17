@@ -32,45 +32,57 @@ namespace Config {
     const char TYPE_MARIO = '@';
 }
 
-class GameObject {
+class BaseObject {
 public:
     float x;
     float y;
     float width;
     float height;
-    float vertical_speed;
-    float horizontal_speed;
-    bool is_flying;
     char object_type;
 
-    GameObject() {
+    BaseObject() {
         x = 0;
         y = 0;
         width = 0;
         height = 0;
-        vertical_speed = 0;
-        horizontal_speed = Config::FRICTION;
-        is_flying = true;
         object_type = ' ';
     }
 
-    GameObject(float x_pos, float y_pos, float obj_width, float obj_height,
-               char cur_type) {
+    BaseObject(float x_pos, float y_pos, float obj_w, float obj_h, char type) {
         x = x_pos;
         y = y_pos;
-        width = obj_width;
-        height = obj_height;
-        vertical_speed = 0;
-        horizontal_speed = Config::FRICTION;
-        is_flying = true;
-        object_type = cur_type;
+        width = obj_w;
+        height = obj_h;
+        object_type = type;
     }
 
-    bool checkCollision(const GameObject& other) const {
+    virtual ~BaseObject() = default;
+
+    bool checkCollision(const BaseObject& other) const {
         return x + width > other.x &&
                x < other.x + other.width &&
                y + height > other.y &&
                y < other.y + other.height;
+    }
+};
+
+class MovableObject : public BaseObject {
+public:
+    float vertical_speed;
+    float horizontal_speed;
+    bool is_flying;
+
+    MovableObject() : BaseObject() {
+        vertical_speed = 0;
+        horizontal_speed = Config::FRICTION;
+        is_flying = true;
+    }
+
+    MovableObject(float x_pos, float y_pos, float obj_w, float obj_h, char t)
+        : BaseObject(x_pos, y_pos, obj_w, obj_h, t) {
+        vertical_speed = 0;
+        horizontal_speed = Config::FRICTION;
+        is_flying = true;
     }
 };
 
@@ -95,7 +107,7 @@ public:
         }
     }
 
-    void drawObject(const GameObject& obj, float camera_x) {
+    void drawObject(const BaseObject& obj, float camera_x) {
         int ix = (int)round(obj.x - camera_x);
         int iy = (int)round(obj.y);
         int iWidth = (int)round(obj.width);
@@ -132,9 +144,9 @@ public:
 class GameEngine {
 private:
     Board board;
-    GameObject mario;
-    std::vector<GameObject> bricks;
-    std::vector<GameObject> moving_objects;
+    MovableObject mario;
+    std::vector<BaseObject> bricks;
+    std::vector<MovableObject> moving_objects;
 
     float camera_x;
     int max_level;
@@ -143,7 +155,7 @@ private:
     bool is_running;
     float mario_dx;
 
-    void applyVerticalPhysics(GameObject& obj) {
+    void applyVerticalPhysics(MovableObject& obj) {
         obj.is_flying = true;
         obj.vertical_speed += Config::GRAVITY;
         obj.y += obj.vertical_speed;
@@ -157,8 +169,8 @@ private:
                 if (bricks[i].object_type == Config::TYPE_BOX &&
                     obj.vertical_speed < 0 && &obj == &mario) {
                     bricks[i].object_type = '-';
-                    GameObject coin(bricks[i].x, bricks[i].y - 3, 3, 2,
-                                    Config::TYPE_COIN);
+                    MovableObject coin(bricks[i].x, bricks[i].y - 3, 3, 2,
+                                       Config::TYPE_COIN);
                     coin.vertical_speed = Config::COIN_DROP_SPEED;
                     moving_objects.push_back(coin);
                 }
@@ -178,7 +190,7 @@ private:
         }
     }
 
-    void applyHorizontalPhysics(GameObject& obj) {
+    void applyHorizontalPhysics(MovableObject& obj) {
         obj.x += obj.horizontal_speed;
         for (size_t i = 0; i < bricks.size(); i++) {
             if (obj.checkCollision(bricks[i])) {
@@ -188,9 +200,9 @@ private:
             }
         }
         if (obj.object_type == Config::TYPE_ENEMY) {
-            GameObject tmp = obj;
+            MovableObject tmp = obj;
             applyVerticalPhysics(tmp);
-            if (tmp.is_flying == true) {
+            if (tmp.is_flying) {
                 obj.x -= obj.horizontal_speed;
                 obj.horizontal_speed = -obj.horizontal_speed;
             }
@@ -202,7 +214,7 @@ private:
             if (mario.checkCollision(moving_objects[i])) {
                 if (moving_objects[i].object_type == Config::TYPE_ENEMY) {
                     float half_h = moving_objects[i].height * 0.5f;
-                    if (mario.is_flying == true && mario.vertical_speed > 0 &&
+                    if (mario.is_flying && mario.vertical_speed > 0 &&
                         mario.y + mario.height < moving_objects[i].y + half_h) {
                         player_score += Config::SCORE_FOR_KILL;
                         moving_objects.erase(moving_objects.begin() + i);
@@ -247,95 +259,95 @@ private:
     void loadLevel(int lvl) {
         bricks.clear();
         moving_objects.clear();
-        mario = GameObject(Config::MARIO_START_X, Config::MARIO_START_Y,
-                           Config::MARIO_WIDTH, Config::MARIO_HEIGHT,
-                           Config::TYPE_MARIO);
+        mario = MovableObject(Config::MARIO_START_X, Config::MARIO_START_Y,
+                              Config::MARIO_WIDTH, Config::MARIO_HEIGHT,
+                              Config::TYPE_MARIO);
         player_score = 0;
         camera_x = 0.0f;
         mario_dx = 0.0f;
 
         if (lvl == 1) {
-            bricks.push_back(GameObject(20, 20, 40, 5, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(30, 10, 5, 3, Config::TYPE_BOX));
-            bricks.push_back(GameObject(50, 10, 5, 3, Config::TYPE_BOX));
-            bricks.push_back(GameObject(60, 15, 40, 10, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(60, 5, 10, 3, Config::TYPE_LINES));
-            bricks.push_back(GameObject(70, 5, 5, 3, Config::TYPE_BOX));
-            bricks.push_back(GameObject(75, 5, 5, 3, Config::TYPE_LINES));
-            bricks.push_back(GameObject(80, 5, 5, 3, Config::TYPE_BOX));
-            bricks.push_back(GameObject(80, 5, 10, 3, Config::TYPE_LINES));
-            bricks.push_back(GameObject(100, 20, 20, 5, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(120, 15, 10, 10, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(150, 20, 40, 5, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(210, 15, 10, 10, Config::TYPE_EXIT));
+            bricks.push_back(BaseObject(20, 20, 40, 5, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(30, 10, 5, 3, Config::TYPE_BOX));
+            bricks.push_back(BaseObject(50, 10, 5, 3, Config::TYPE_BOX));
+            bricks.push_back(BaseObject(60, 15, 40, 10, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(60, 5, 10, 3, Config::TYPE_LINES));
+            bricks.push_back(BaseObject(70, 5, 5, 3, Config::TYPE_BOX));
+            bricks.push_back(BaseObject(75, 5, 5, 3, Config::TYPE_LINES));
+            bricks.push_back(BaseObject(80, 5, 5, 3, Config::TYPE_BOX));
+            bricks.push_back(BaseObject(80, 5, 10, 3, Config::TYPE_LINES));
+            bricks.push_back(BaseObject(100, 20, 20, 5, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(120, 15, 10, 10, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(150, 20, 40, 5, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(210, 15, 10, 10, Config::TYPE_EXIT));
 
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
         }
 
         if (lvl == 2) {
-            bricks.push_back(GameObject(20, 20, 40, 5, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(30, 10, 5, 3, Config::TYPE_BOX));
-            bricks.push_back(GameObject(50, 10, 5, 3, Config::TYPE_BOX));
-            bricks.push_back(GameObject(60, 15, 10, 10, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(80, 20, 20, 5, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(120, 15, 10, 10, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(122, 5, 5, 3, Config::TYPE_BOX));
-            bricks.push_back(GameObject(150, 20, 40, 5, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(210, 15, 10, 10, Config::TYPE_EXIT));
+            bricks.push_back(BaseObject(20, 20, 40, 5, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(30, 10, 5, 3, Config::TYPE_BOX));
+            bricks.push_back(BaseObject(50, 10, 5, 3, Config::TYPE_BOX));
+            bricks.push_back(BaseObject(60, 15, 10, 10, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(80, 20, 20, 5, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(120, 15, 10, 10, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(122, 5, 5, 3, Config::TYPE_BOX));
+            bricks.push_back(BaseObject(150, 20, 40, 5, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(210, 15, 10, 10, Config::TYPE_EXIT));
 
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 65, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 120, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 160, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 175, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
         }
 
         if (lvl == 3) {
-            bricks.push_back(GameObject(20, 20, 40, 5, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(80, 20, 15, 5, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(120, 15, 15, 10, Config::TYPE_BRICK));
-            bricks.push_back(GameObject(160, 10, 15, 15, Config::TYPE_EXIT));
+            bricks.push_back(BaseObject(20, 20, 40, 5, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(80, 20, 15, 5, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(120, 15, 15, 10, Config::TYPE_BRICK));
+            bricks.push_back(BaseObject(160, 10, 15, 15, Config::TYPE_EXIT));
 
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 50, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 90, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 120, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(
+            moving_objects.push_back(MovableObject(
                 130, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
                 Config::TYPE_ENEMY));
         }
@@ -389,7 +401,7 @@ public:
                 if (ch == 27) {
                     is_running = false;
                 }
-                if (ch == ' ' && mario.is_flying == false) {
+                if (ch == ' ' && !mario.is_flying) {
                     mario.vertical_speed = Config::JUMP_POWER;
                 }
                 if (ch == 'a' || ch == 'A' || ch == KEY_LEFT) {
