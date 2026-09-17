@@ -4,6 +4,7 @@
 #include <ncurses.h>
 
 namespace Config {
+    const float MARIO_SPEED = 0.5f;
     const float COIN_DROP_SPEED = -0.7f;
     const float ENEMY_WIDTH = 3.0f;
     const float ENEMY_HEIGHT = 2.0f;
@@ -53,7 +54,8 @@ public:
         object_type = ' ';
     }
 
-    GameObject(float x_pos, float y_pos, float obj_width, float obj_height, char cur_type) {
+    GameObject(float x_pos, float y_pos, float obj_width, float obj_height,
+               char cur_type) {
         x = x_pos;
         y = y_pos;
         width = obj_width;
@@ -65,28 +67,35 @@ public:
     }
 
     bool checkCollision(const GameObject& other) const {
-        return ((x + width) > other.x) && (x < (other.x + other.width)) && ((y + height) > other.y) && (y < (other.y + other.height));
+        return x + width > other.x &&
+               x < other.x + other.width &&
+               y + height > other.y &&
+               y < other.y + other.height;
     }
 };
 
-class GameEngine {
+class Board {
 private:
-    GameObject mario;
-    std::vector<GameObject> bricks;
-    std::vector<GameObject> moving_objects;
     char map[Config::MAP_HEIGHT][Config::MAP_WIDTH + 1];
 
-    float camera_x;
-    int max_level;
-    int current_level;
-    int player_score;
-    bool is_running;
-
     bool isPositionOnMap(int x, int y) const {
-        return (x >= 0 && x < Config::MAP_WIDTH && y >= 0 && y < Config::MAP_HEIGHT);
+        return x >= 0 && x < Config::MAP_WIDTH &&
+               y >= 0 && y < Config::MAP_HEIGHT;
     }
 
-    void putObjectOnMap(const GameObject& obj) {
+public:
+    void clearMap() {
+        for (int i = 0; i < Config::MAP_WIDTH; i++) {
+            map[0][i] = ' ';
+            map[1][i] = ' ';
+        }
+        map[0][Config::MAP_WIDTH] = '\0';
+        for (int j = 1; j < Config::MAP_HEIGHT; j++) {
+            snprintf(map[j], sizeof(map[j]), "%s", map[0]);
+        }
+    }
+
+    void drawObject(const GameObject& obj, float camera_x) {
         int ix = (int)round(obj.x - camera_x);
         int iy = (int)round(obj.y);
         int iWidth = (int)round(obj.width);
@@ -101,7 +110,7 @@ private:
         }
     }
 
-    void putScoreOnMap() {
+    void drawScore(int player_score) {
         for (int i = Config::SCORE_X_OFFSET; i < Config::SCORE_AREA_WIDTH; i++) {
             map[1][i] = ' ';
         }
@@ -111,36 +120,45 @@ private:
         }
     }
 
-    void showMap() const {
+    void display() const {
+        clear();
         for (int j = 0; j < Config::MAP_HEIGHT; j++) {
             mvprintw(j, 0, "%s", map[j]);
         }
         refresh();
     }
+};
 
-    void clearMap() {
-        for (int i = 0; i < Config::MAP_WIDTH; i++) {
-            map[0][i] = ' ';
-            map[1][i] = ' ';
-        }
-        map[0][Config::MAP_WIDTH] = '\0';
-        for (int j = 1; j < Config::MAP_HEIGHT; j++) {
-            snprintf(map[j], sizeof(map[j]), "%s", map[0]);
-        }
-    }
+class GameEngine {
+private:
+    Board board;
+    GameObject mario;
+    std::vector<GameObject> bricks;
+    std::vector<GameObject> moving_objects;
+
+    float camera_x;
+    int max_level;
+    int current_level;
+    int player_score;
+    bool is_running;
+    float mario_dx;
 
     void applyVerticalPhysics(GameObject& obj) {
         obj.is_flying = true;
         obj.vertical_speed += Config::GRAVITY;
         obj.y += obj.vertical_speed;
+
         for (size_t i = 0; i < bricks.size(); i++) {
             if (obj.checkCollision(bricks[i])) {
                 if (obj.vertical_speed > 0) {
                     obj.is_flying = false;
                 }
-                if ((bricks[i].object_type == Config::TYPE_BOX) && (obj.vertical_speed < 0) && (&obj == &mario)) {
+
+                if (bricks[i].object_type == Config::TYPE_BOX &&
+                    obj.vertical_speed < 0 && &obj == &mario) {
                     bricks[i].object_type = '-';
-                    GameObject coin(bricks[i].x, bricks[i].y - 3, 3, 2, Config::TYPE_COIN);
+                    GameObject coin(bricks[i].x, bricks[i].y - 3, 3, 2,
+                                    Config::TYPE_COIN);
                     coin.vertical_speed = Config::COIN_DROP_SPEED;
                     moving_objects.push_back(coin);
                 }
@@ -184,7 +202,8 @@ private:
             if (mario.checkCollision(moving_objects[i])) {
                 if (moving_objects[i].object_type == Config::TYPE_ENEMY) {
                     float half_h = moving_objects[i].height * 0.5f;
-                    if ((mario.is_flying == true) && (mario.vertical_speed > 0) && (mario.y + mario.height < moving_objects[i].y + half_h)) {
+                    if (mario.is_flying == true && mario.vertical_speed > 0 &&
+                        mario.y + mario.height < moving_objects[i].y + half_h) {
                         player_score += Config::SCORE_FOR_KILL;
                         moving_objects.erase(moving_objects.begin() + i);
                         i--;
@@ -211,29 +230,29 @@ private:
 
     void moveMapHorizontally(float dx) {
         float old_x = mario.x;
-        mario.x -= dx;
+        mario.x += dx;
+
         for (size_t i = 0; i < bricks.size(); i++) {
             if (mario.checkCollision(bricks[i])) {
                 mario.x = old_x;
+                mario_dx = 0.0f;
                 return;
             }
         }
+
         camera_x = mario.x - Config::MAP_WIDTH / 2.0f;
         if (camera_x < 0) camera_x = 0;
-        for (size_t i = 0; i < bricks.size(); i++) {
-            bricks[i].x += dx;
-        }
-        for (size_t i = 0; i < moving_objects.size(); i++) {
-            moving_objects[i].x += dx;
-        }
     }
 
     void loadLevel(int lvl) {
         bricks.clear();
         moving_objects.clear();
-        mario = GameObject(Config::MARIO_START_X, Config::MARIO_START_Y, Config::MARIO_WIDTH, Config::MARIO_HEIGHT, Config::TYPE_MARIO);
+        mario = GameObject(Config::MARIO_START_X, Config::MARIO_START_Y,
+                           Config::MARIO_WIDTH, Config::MARIO_HEIGHT,
+                           Config::TYPE_MARIO);
         player_score = 0;
         camera_x = 0.0f;
+        mario_dx = 0.0f;
 
         if (lvl == 1) {
             bricks.push_back(GameObject(20, 20, 40, 5, Config::TYPE_BRICK));
@@ -249,8 +268,13 @@ private:
             bricks.push_back(GameObject(120, 15, 10, 10, Config::TYPE_BRICK));
             bricks.push_back(GameObject(150, 20, 40, 5, Config::TYPE_BRICK));
             bricks.push_back(GameObject(210, 15, 10, 10, Config::TYPE_EXIT));
-            moving_objects.push_back(GameObject(25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
+
+            moving_objects.push_back(GameObject(
+                25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
         }
 
         if (lvl == 2) {
@@ -263,14 +287,31 @@ private:
             bricks.push_back(GameObject(122, 5, 5, 3, Config::TYPE_BOX));
             bricks.push_back(GameObject(150, 20, 40, 5, Config::TYPE_BRICK));
             bricks.push_back(GameObject(210, 15, 10, 10, Config::TYPE_EXIT));
-            moving_objects.push_back(GameObject(25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(65, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(120, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(160, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(175, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
+
+            moving_objects.push_back(GameObject(
+                25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                65, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                120, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                160, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                175, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
         }
 
         if (lvl == 3) {
@@ -278,12 +319,25 @@ private:
             bricks.push_back(GameObject(80, 20, 15, 5, Config::TYPE_BRICK));
             bricks.push_back(GameObject(120, 15, 15, 10, Config::TYPE_BRICK));
             bricks.push_back(GameObject(160, 10, 15, 15, Config::TYPE_EXIT));
-            moving_objects.push_back(GameObject(25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(50, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(90, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(120, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
-            moving_objects.push_back(GameObject(130, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT, Config::TYPE_ENEMY));
+
+            moving_objects.push_back(GameObject(
+                25, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                50, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                80, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                90, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                120, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
+            moving_objects.push_back(GameObject(
+                130, 10, Config::ENEMY_WIDTH, Config::ENEMY_HEIGHT,
+                Config::TYPE_ENEMY));
         }
     }
 
@@ -303,19 +357,18 @@ private:
     }
 
     void render() {
-        clearMap();
+        board.clearMap();
 
         for (size_t i = 0; i < bricks.size(); i++) {
-            putObjectOnMap(bricks[i]);
+            board.drawObject(bricks[i], camera_x);
         }
         for (size_t i = 0; i < moving_objects.size(); i++) {
-            putObjectOnMap(moving_objects[i]);
+            board.drawObject(moving_objects[i], camera_x);
         }
-        putObjectOnMap(mario);
-        putScoreOnMap();
+        board.drawObject(mario, camera_x);
+        board.drawScore(player_score);
 
-        clear();
-        showMap();
+        board.display();
     }
 
 public:
@@ -325,6 +378,7 @@ public:
         current_level = 1;
         player_score = 0;
         is_running = true;
+        mario_dx = 0.0f;
         loadLevel(current_level);
     }
 
@@ -339,14 +393,21 @@ public:
                     mario.vertical_speed = Config::JUMP_POWER;
                 }
                 if (ch == 'a' || ch == 'A' || ch == KEY_LEFT) {
-                    moveMapHorizontally(1);
+                    mario_dx = -Config::MARIO_SPEED;
                 }
                 if (ch == 'd' || ch == 'D' || ch == KEY_RIGHT) {
-                    moveMapHorizontally(-1);
+                    mario_dx = Config::MARIO_SPEED;
+                }
+                if (ch == 's' || ch == 'S' || ch == KEY_DOWN) {
+                    mario_dx = 0.0f;
                 }
             }
 
             if (!is_running) break;
+
+            if (mario_dx != 0.0f) {
+                moveMapHorizontally(mario_dx);
+            }
 
             update();
             render();
@@ -359,7 +420,7 @@ public:
 void showPreview() {
     clear();
     printw("МАРИО НА C++\n");
-    printw("Управление: A/D - движение, Пробел - прыжок, ESC - выход\n");
+    printw("Управление: A/D - непрерывное движение, S - стоп, Пробел - прыжок, ESC\n");
     printw("Нажмите любую клавишу для начала...");
     refresh();
     nodelay(stdscr, false);
